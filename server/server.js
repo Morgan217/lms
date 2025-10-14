@@ -1,25 +1,26 @@
-import express from 'express'
-import cors from 'cors'
-import 'dotenv/config'
+import express from 'express';
+import cors from 'cors';
+import 'dotenv/config';
 import connectToMongoDB from './configs/mongodb.js';
-import {clerkWebhooks} from './controllers/webhook.js'
+import { clerkWebhooks } from './controllers/webhook.js';
 
-//initialize express
-const app=express()
+// Initialize express
+const app = express();
 
-//connect to db
+// Connect to DB
 await connectToMongoDB();
 
-//Middlewares
-app.use(cors())
+// Middlewares
+app.use(cors());
+app.use(express.json()); // You can also enable this globally
 
-//Routes
-app.get('/',(req, res)=> res.send("API Working"))
-app.post('/clerk',express.json,clerkWebhooks)
+// Routes
+app.get('/', (req, res) => res.send("API Working"));
+app.post('/clerk', clerkWebhooks);
 
-//Port
-const PORT =process.env.process || 5000
+// Port
+const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, ()=>{
-    console.log(`Server is running on Port ${PORT}`)
-})
+app.listen(PORT, () => {
+  console.log(`Server is running on Port ${PORT}`);
+});
