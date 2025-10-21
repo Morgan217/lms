@@ -27,7 +27,7 @@ app.post('/clerk', clerkWebhooks);
 app.use('/api/educator', requireAuth(), educatorRoute);// Educator route: require authentication so req.auth.userId exists
 app.use('/api/course',express.json(),courseRouter);
 app.use('/api/user',express.json(),userRouter);
-app.post('/stripe', express.raw({type: 'application.json'}), stripeWebhooks)
+app.post('/stripe', express.raw({type: 'application/json'}), stripeWebhooks)
 
 
 // Port
