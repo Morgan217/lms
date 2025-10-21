@@ -153,67 +153,38 @@ export const stripeWebhooks = async (request, response) => {
 };
 
 
-export const testPurchaseComplete = async (req, res) => {
+export const testerUpdateDB = async (userId, courseId) => {
+  if (!userId || !courseId) {
+    throw new Error("userId and courseId are required");
+  }
+
   try {
-    const { purchaseId } = req.body;
-
-    if (!purchaseId) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing purchaseId in request body",
-      });
-    }
-
-    // Find the purchase
-    const purchaseData = await Purchase.findById(purchaseId);
-    if (!purchaseData) {
-      return res.status(404).json({
-        success: false,
-        message: `Purchase not found for ID: ${purchaseId}`,
-      });
-    }
-
-    // Find the user and course
-    const userData = await User.findById(purchaseData.userId);
-    const courseData = await Course.findById(purchaseData.courseId);
+    const userData = await User.findById(userId);
+    const courseData = await Course.findById(courseId);
 
     if (!userData || !courseData) {
-      return res.status(404).json({
-        success: false,
-        message: `User or Course not found. userId=${purchaseData.userId}, courseId=${purchaseData.courseId}`,
-      });
+      throw new Error("User or course not found");
     }
 
-    // Push user and course relationships
-    if (!courseData.enrolledStudents.includes(userData._id)) {
-      courseData.enrolledStudents.push(userData._id);
+    // Enroll user in course
+    if (!courseData.enrolledStudents.includes(userId)) {
+      courseData.enrolledStudents.push(userId);
       await courseData.save();
     }
 
-    if (!userData.enrolledCourses.includes(courseData._id)) {
-      userData.enrolledCourses.push(courseData._id);
+    // Add course to user's enrolled courses
+    if (!userData.enrolledCourses.includes(courseId)) {
+      userData.enrolledCourses.push(courseId);
       await userData.save();
     }
 
-    // Update purchase status
-    purchaseData.status = "completed";
-    await purchaseData.save();
-
-    return res.json({
-      success: true,
-      message: `Test purchase marked as completed and linked.`,
-      data: {
-        purchaseId: purchaseData._id,
-        userId: userData._id,
-        courseId: courseData._id,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    console.log(`User ${userId} enrolled in course ${courseId} successfully.`);
+    return { success: true, message: `User ${userId} enrolled in course ${courseId}` };
+  } catch (err) {
+    console.error("Error enrolling user:", err);
+    return { success: false, error: err.message };
   }
 };
 
 export { clerkWebhooks };
+

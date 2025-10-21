@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 import connectToMongoDB from './configs/mongodb.js';
-import { clerkWebhooks, stripeWebhooks, testPurchaseComplete } from './controllers/webhook.js';
+import { clerkWebhooks, stripeWebhooks, testerUpdateDB, testerUpdateDB } from './controllers/webhook.js';
 import educatorRoute from './routes/educatorRoutes.js';
 import { clerkMiddleware, requireAuth } from '@clerk/express';
 import connectCloudinary from './configs/cloudinary.js';
@@ -30,7 +30,7 @@ app.use('/api/user',express.json(),userRouter);
 app.post('/stripe', express.raw({type: 'application/json'}), stripeWebhooks)
 
 //test
-app.post("/test-purchase-complete", testPurchaseComplete);
+app.post("/test-purchase-complete", testerUpdateDB);
 
 
 // Port
