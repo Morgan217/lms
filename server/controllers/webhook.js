@@ -152,4 +152,68 @@ export const stripeWebhooks = async (request, response) => {
   response.json({ received: true });
 };
 
+
+export const testPurchaseComplete = async (req, res) => {
+  try {
+    const { purchaseId } = req.body;
+
+    if (!purchaseId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing purchaseId in request body",
+      });
+    }
+
+    // Find the purchase
+    const purchaseData = await Purchase.findById(purchaseId);
+    if (!purchaseData) {
+      return res.status(404).json({
+        success: false,
+        message: `Purchase not found for ID: ${purchaseId}`,
+      });
+    }
+
+    // Find the user and course
+    const userData = await User.findById(purchaseData.userId);
+    const courseData = await Course.findById(purchaseData.courseId);
+
+    if (!userData || !courseData) {
+      return res.status(404).json({
+        success: false,
+        message: `User or Course not found. userId=${purchaseData.userId}, courseId=${purchaseData.courseId}`,
+      });
+    }
+
+    // Push user and course relationships
+    if (!courseData.enrolledStudents.includes(userData._id)) {
+      courseData.enrolledStudents.push(userData._id);
+      await courseData.save();
+    }
+
+    if (!userData.enrolledCourses.includes(courseData._id)) {
+      userData.enrolledCourses.push(courseData._id);
+      await userData.save();
+    }
+
+    // Update purchase status
+    purchaseData.status = "completed";
+    await purchaseData.save();
+
+    return res.json({
+      success: true,
+      message: `Test purchase marked as completed and linked.`,
+      data: {
+        purchaseId: purchaseData._id,
+        userId: userData._id,
+        courseId: courseData._id,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 export { clerkWebhooks };
