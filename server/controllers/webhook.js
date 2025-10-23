@@ -152,7 +152,6 @@ export const stripeWebhooks = async (request, response) => {
   response.json({ received: true });
 };
 
-
 export const testerUpdateDB = async (userId, courseId) => {
   if (!userId || !courseId) {
     throw new Error("userId and courseId are required");
