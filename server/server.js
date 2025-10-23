@@ -12,29 +12,32 @@ import userRouter from './routes/userRouter.js';
 // Initialize express
 const app = express();
 
-// Connect to MongoDB
+// Connect to MongoDB & Cloudinary
 await connectToMongoDB();
 await connectCloudinary();
 
-// Middlewares
+// Global middlewares that won't affect Stripe
 app.use(cors());
+
+// ✅ Stripe Webhook FIRST (before express.json)
+app.post('/stripe', express.raw({ type: 'application/json' }), stripeWebhooks);
+
+// ✅ Then add express.json for everything else
 app.use(express.json());
-app.use(clerkMiddleware()); // Parses Clerk auth headers
+app.use(clerkMiddleware()); // parses Clerk auth headers
 
 // Routes
 app.get('/', (req, res) => res.send("API Working"));
 app.post('/clerk', clerkWebhooks);
-app.use('/api/educator', requireAuth(), educatorRoute);// Educator route: require authentication so req.auth.userId exists
-app.use('/api/course',express.json(),courseRouter);
-app.use('/api/user',express.json(),userRouter);
-app.post('/stripe', express.raw({type: 'application/json'}), stripeWebhooks)
+app.use('/api/educator', requireAuth(), educatorRoute);
+app.use('/api/course', courseRouter);
+app.use('/api/user', userRouter);
 
-//test
+// Test route
 app.post("/test-purchase-complete", testerUpdateDB);
-
 
 // Port
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server is running on Port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
