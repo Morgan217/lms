@@ -3,13 +3,41 @@ import { Link } from 'react-router-dom'
 import {assets} from '../../assets/assets'
 import { useClerk, UserButton, useUser } from '@clerk/clerk-react'
 import { AppContext } from '../../context/AppContext'
+import axios from 'axios'
+import { toast } from 'react-toastify'
 
 function StudentNavbar() {
 
   const isCourseListPage=location.pathname.includes('/course-list')
   const {openSignIn}=useClerk()
   const {user}=useUser()
-  const {navigate, isEducator}=useContext(AppContext)
+  const {navigate, isEducator, backendUrl, setIsEducator, getToken}=useContext(AppContext)
+
+
+  const becomeEducator = async ()=>{
+    try {
+
+      if(isEducator){
+        navigate('/educator')
+        return ;
+      }
+
+      const token= await getToken()
+      const {data} = await axios.get(backendUrl+'/api/educator/update-role',{headers:{Authorization: `Bearer ${token}`}})
+
+      if(data.success)
+      {
+        setIsEducator(true)
+        toast.success(data.message)
+      }
+      else{
+        toast.error(error.message)
+      }
+      
+    } catch (error) {
+      toast.error(error.message)
+    }
+  };
 
   return (
     <div className={`flex items-center justify-between px-4 sm:px-10 md:px-14 
@@ -22,7 +50,7 @@ function StudentNavbar() {
             <div className='flex items-center gap-5'>
                {user &&
               <>
-              <button onClick={()=>{navigate('/educator')}}>{isEducator ? 'Educator Dashboard' : 'Become Educator'}</button>
+              <button onClick={becomeEducator}>{isEducator ? 'Educator Dashboard' : 'Become Educator'}</button>
                 | <Link to='/my-enrollments'>My Enrollment</Link>
 
               </>
@@ -36,7 +64,7 @@ function StudentNavbar() {
                 <div>
                   {user &&
               <>
-              <button onClick={()=>{navigate('/educator')}}>{isEducator ? 'Educator Dashboard' : 'Become Educator'}</button>
+              <button onClick={()=>{becomeEducator}}>{isEducator ? 'Educator Dashboard' : 'Become Educator'}</button>
                 | <Link to='/my-enrollments'>My Enrollment</Link> 
 
               </>

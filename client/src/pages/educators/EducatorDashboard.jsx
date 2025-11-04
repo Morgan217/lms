@@ -2,22 +2,47 @@ import React, { useContext, useEffect, useState } from "react";
 import { AppContext } from "../../context/AppContext";
 import { assets, dummyDashboardData } from "../../assets/assets";
 import Loading from "../../components/student/Loading";
+import axios from "axios";
+import { toast } from "react-toastify";
 
 function EducatorDashboard() {
-  const { currency } = useContext(AppContext);
+  const { currency, backendUrl, isEducator, getToken } = useContext(AppContext);
   const [dashboardData, setDashboardData] = useState(null);
 
   const fetchDashboardData = async () => {
     // Simulate fetching data
-    setDashboardData(dummyDashboardData);
+    try {
+      const token= await getToken()
+      const{data} = await axios.get(backendUrl+'/api/educator/dashboard', {headers:{Authorization: `Bearer ${token}`}})
+      console.log(data)
+
+      if(data.success)
+      {
+        
+        setDashboardData(data.message)
+      }
+      else{
+         console.log(data.message)
+        toast.error(data.message);
+
+      }
+      
+    } catch (error) {
+       console.log(error.message)
+      toast.error(error.message);
+      
+    }
   };
 
   // ✅ Run only once on mount
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+   if(isEducator)
+   {
+    fetchDashboardData()
+   }
+  }, [isEducator]);
 
-  if (!dashboardData) return <Loading />;
+  if (!dashboardData || !dashboardData.enrolledStudentsData) return <Loading />;
 
   return (
     <div className="min-h-screen flex flex-col gap-10 md:p-8 pt-8">

@@ -8,6 +8,7 @@ import { clerkMiddleware, requireAuth } from '@clerk/express';
 import connectCloudinary from './configs/cloudinary.js';
 import courseRouter from './routes/courseRoutes.js';
 import userRouter from './routes/userRouter.js';
+import path from "path";
 
 // Initialize express
 const app = express();
@@ -35,6 +36,8 @@ app.use('/api/user', userRouter);
 
 // Test route
 app.post("/test-purchase-complete", testerUpdateDB);
+
+app.use("/certificates", express.static(path.join(process.cwd(), "certificates")));
 
 // Port
 const PORT = process.env.PORT || 5000;

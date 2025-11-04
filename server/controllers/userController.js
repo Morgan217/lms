@@ -169,3 +169,36 @@ export const addUserRating= async (req, res)=>{
         res.json({success: false, message: error.message})
     }
 }
+
+// Get Educator Courses with completion status for the logged-in user
+export const getEducatorCourses = async (req, res) => {
+  try {
+    const educatorId = req.auth.userId;
+
+    // Fetch all courses by this educator
+    const courses = await Course.find({ educator: educatorId });
+
+    // Fetch all completed purchases by the current user for these courses
+    const courseIds = courses.map(c => c._id);
+    const completedPurchases = await Purchase.find({
+      userId: req.auth.userId,
+      courseId: { $in: courseIds },
+      status: 'completed'
+    });
+
+    const completedCourseIds = new Set(
+      completedPurchases.map(p => p.courseId.toString())
+    );
+
+    // Attach `completed` flag to each course
+    const coursesWithStatus = courses.map(course => ({
+      ...course.toObject(),
+      completed: completedCourseIds.has(course._id.toString())
+    }));
+
+    res.json({ success: true, courses: coursesWithStatus });
+
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

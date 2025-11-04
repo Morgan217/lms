@@ -6,12 +6,12 @@ import { assets } from '../../assets/assets'
 import { AppContext } from '../../context/AppContext'
 import { toast } from 'react-toastify'
 import axios from 'axios'
+import { useParams, useNavigate } from 'react-router-dom'
 
-
-function EducatorAddCourses() {
-
-
-  const {backendUrl, getToken}= useContext(AppContext)
+function EducatorEditCourse() {
+  const { backendUrl, getToken, userData, enrolledCourses } = useContext(AppContext)
+  const { id } = useParams()
+  const navigate = useNavigate()
 
   const quillRef = useRef(null)
   const editorRef = useRef(null)
@@ -20,11 +20,14 @@ function EducatorAddCourses() {
   const [coursePrice, setCoursePrice] = useState(0)
   const [discount, setDiscount] = useState(0)
   const [image, setImage] = useState(null)
+  const [existingImage, setExistingImage] = useState(null)
   const [chapters, setChapters] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [courseData, setCourseData] = useState(null)
 
   const [showPopup, setShowPopup] = useState(false)
   const [selectedChapterIndex, setSelectedChapterIndex] = useState(null)
-
+  const [editingLectureIndex, setEditingLectureIndex] = useState(null)
   const [lectureDetails, setLectureDetails] = useState({
     lectureTitle: '',
     lectureDuration: '',
@@ -32,34 +35,68 @@ function EducatorAddCourses() {
     isPreviewFree: false,
   })
 
-  const addLectures=()=>{
-    setChapters(
-      chapters.map((chapter)=>{
-        if(chapter.chapterId===setCurrentChapterId){
-          const newLecture={
-            ...lectureDetails,
-            lectureOrder: chapter.chapterContent.length >0 ? chapter.chapterContent.splice(-1)[0].lectureOrder +1:1,
-            lectureId: uniqid()
-
-          };
-          chapter.chapterContent.push(newLecture);
-        }
-        return chapter;
-      })
-    )
-  }
-
-  // ✅ Initialize Quill once
+  // --- Fetch course data ---
   useEffect(() => {
-    if (!quillRef.current && editorRef.current) {
-      quillRef.current = new Quill(editorRef.current, {
-        theme: 'snow',
-        placeholder: 'Write the course description here...',
-      })
-    }
-  }, [])
+    let cancelled = false
+    const fetchCourse = async () => {
+      try {
+        const token = await getToken()
+        const { data } = await axios.get(`${backendUrl}/api/course/course-get/${id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
 
-  // ✅ Handle all chapter actions
+        if (!cancelled && data.success && data.courseData) {
+          const c = data.courseData
+
+          const formattedChapters = (c.courseContent || []).map((chapter, chIndex) => ({
+            chapterId: chapter.chapterId,
+            chapterOrder: chapter.chapterOrder || chIndex + 1,
+            chapterTitle: chapter.chapterTitle || '',
+            lectures: (chapter.chapterContent || []).map((lec, lecIndex) => ({
+              lectureId: lec.lectureId || lec._id || uniqid(),
+              lectureTitle: lec.lectureTitle || lec.title || '',
+              lectureDuration: lec.lectureDuration || lec.duration || 0,
+              lectureUrl: lec.lectureUrl || lec.videoUrl || lec.lectureVideo || '',
+              isPreviewFree: lec.isPreviewFree || false,
+              lectureOrder: lec.lectureOrder || lecIndex + 1,
+            })),
+          }))
+
+          setCourseTitle(c.courseTitle || '')
+          setCoursePrice(c.coursePrice || 0)
+          setDiscount(c.discount || 0)
+          setExistingImage(c.courseThumbnail || null)
+          setChapters(formattedChapters)
+          setCourseData(c)
+        } else if (!cancelled) {
+          toast.error('Failed to load course details')
+        }
+      } catch (error) {
+        if (!cancelled) toast.error(error.message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    fetchCourse()
+    return () => {
+      cancelled = true
+    }
+  }, [id, backendUrl, getToken])
+
+  // --- Initialize Quill only AFTER courseData loads ---
+  useEffect(() => {
+    if (!courseData || !editorRef.current || quillRef.current) return
+
+    quillRef.current = new Quill(editorRef.current, {
+      theme: 'snow',
+      placeholder: 'Write or edit the course description...',
+    })
+
+    quillRef.current.root.innerHTML = courseData.courseDescription || ''
+  }, [courseData])
+
+  // --- Handle chapters ---
   const handleChapter = (action, chapterId) => {
     if (action === 'add') {
       const title = prompt('Enter Chapter Name:')
@@ -74,13 +111,13 @@ function EducatorAddCourses() {
               ? chapters[chapters.length - 1].chapterOrder + 1
               : 1,
         }
-        setChapters([...chapters, newChapter])
+        setChapters((prev) => [...prev, newChapter])
       }
     } else if (action === 'remove') {
-      setChapters(chapters.filter((chapter) => chapter.id !== chapterId))
+      setChapters((prev) => prev.filter((chapter) => chapter.id !== chapterId))
     } else if (action === 'toggle') {
-      setChapters(
-        chapters.map((chapter) =>
+      setChapters((prev) =>
+        prev.map((chapter) =>
           chapter.id === chapterId
             ? { ...chapter, collapsed: !chapter.collapsed }
             : chapter
@@ -89,120 +126,118 @@ function EducatorAddCourses() {
     }
   }
 
-  const handleLecture=(action, chapterId, lectureIndex)=>{
-    if(action==='add')
-    {
-      setCurrentChapterId(chapterId);
-      setShowPopup(true);
-
-    }
-    else if(action==='remove')
-    {
-      chapters.map((chapter)=> {
-        if(chapter.chapterId===chapterId){
-          chapter.chapterContent.splice(lectureIndex, 1);
-        }
-        return chapter;
+  // --- Lecture management ---
+  const openLecturePopup = (chapterIndex, lectureIndex = null) => {
+    setSelectedChapterIndex(chapterIndex)
+    setEditingLectureIndex(lectureIndex)
+    if (lectureIndex !== null) {
+      setLectureDetails({ ...chapters[chapterIndex].lectures[lectureIndex] })
+    } else {
+      setLectureDetails({
+        lectureTitle: '',
+        lectureDuration: '',
+        lectureUrl: '',
+        isPreviewFree: false,
       })
     }
-
-
-  }
-
-  // ✅ Open lecture popup
-  const openLecturePopup = (chapterIndex) => {
-    setSelectedChapterIndex(chapterIndex)
     setShowPopup(true)
   }
 
-  // ✅ Add lecture to selected chapter
-  const addLecture = () => {
+  const saveLecture = () => {
     if (selectedChapterIndex === null) return
-
-    const updated = [...chapters]
-    updated[selectedChapterIndex].lectures.push({ ...lectureDetails })
-
-    setChapters(updated)
+    setChapters((prev) => {
+      const updated = [...prev]
+      if (editingLectureIndex !== null) {
+        updated[selectedChapterIndex].lectures[editingLectureIndex] = {
+          ...lectureDetails,
+        }
+      } else {
+        updated[selectedChapterIndex].lectures.push({ ...lectureDetails })
+      }
+      return updated
+    })
     setLectureDetails({
       lectureTitle: '',
       lectureDuration: '',
       lectureUrl: '',
       isPreviewFree: false,
     })
+    setEditingLectureIndex(null)
     setShowPopup(false)
   }
 
-  // ✅ Delete lecture
   const deleteLecture = (chapterIndex, lectureIndex) => {
-    const updated = [...chapters]
-    updated[chapterIndex].lectures.splice(lectureIndex, 1)
-    setChapters(updated)
+    setChapters((prev) => {
+      const updated = [...prev]
+      updated[chapterIndex].lectures.splice(lectureIndex, 1)
+      return updated
+    })
   }
 
-  // ✅ Delete chapter
   const deleteChapter = (index) => {
-    setChapters(chapters.filter((_, i) => i !== index))
+    setChapters((prev) => prev.filter((_, i) => i !== index))
   }
 
-const handleSubmit = async (e) => {
-  try {
-    e.preventDefault();
+  // --- Submit updated course ---
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      const formattedChapters = chapters.map((chapter, index) => ({
+        chapterId: chapter.id || uniqid(),
+        chapterOrder: index + 1,
+        chapterTitle: chapter.chapterTitle,
+        chapterContent: (chapter.lectures || []).map((lecture, lecIndex) => ({
+          lectureId: lecture.lectureId || uniqid(),
+          lectureTitle: lecture.lectureTitle,
+          lectureDuration: Number(lecture.lectureDuration) || 0,
+          lectureUrl: lecture.lectureUrl,
+          isPreviewFree: Boolean(lecture.isPreviewFree),
+          lectureOrder: lecIndex + 1,
+        })),
+      }))
 
-    if (!image) {
-      toast.error('Thumbnail Not Selected');
-      return;
+      const CourseData = {
+        courseId: id, // <-- add this line
+        courseTitle,
+        courseDescription:
+          quillRef.current && quillRef.current.root
+            ? quillRef.current.root.innerHTML
+            : '',
+        coursePrice: Number(coursePrice),
+        discount: Number(discount),
+        courseContent: formattedChapters,
+      }
+
+      const formData = new FormData()
+      formData.append('courseData', JSON.stringify(CourseData))
+      if (image) formData.append('image', image)
+
+      for (let pair of formData.entries()) {
+  console.log(pair[0] + ': ' + pair[1]);
+}
+
+      const token = await getToken()
+      const { data } = await axios.put(
+        `${backendUrl}/api/course/course-update/${id}`,
+        formData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+
+      if (data.success) {
+        toast.success('Course updated successfully!')
+
+        console.log("Success updated")
+      } else {
+        toast.error(data.message)
+         console.log(data.message)
+      }
+    } catch (error) {
+      toast.error(error.message)
+       console.log(error.message)
     }
-
-    // ✅ Map chapters to match backend schema
-    const formattedChapters = chapters.map((chapter, index) => ({
-      chapterId: uniqid(), // required by schema
-      chapterOrder: index + 1,
-      chapterTitle: chapter.chapterTitle,
-      // Each lecture in chapter
-      chapterContent: (chapter.lectures || []).map((lecture, lecIndex) => ({
-        lectureId: uniqid(),
-        lectureTitle: lecture.lectureTitle,
-        lectureDuration: Number(lecture.lectureDuration) || 0,
-        lectureUrl: lecture.lectureUrl,
-        isPreviewFree: Boolean(lecture.isPreviewFree),
-        lectureOrder: lecIndex + 1,
-      })),
-    }));
-
-    const CourseData = {
-      courseTitle,
-      courseDescription: quillRef.current.root.innerHTML,
-      coursePrice: Number(coursePrice),
-      discount: Number(discount),
-      courseContent: formattedChapters,
-    };
-
-    const formData = new FormData();
-    formData.append('courseData', JSON.stringify(CourseData));
-    formData.append('image', image);
-
-    const token = await getToken();
-    const { data } = await axios.post(
-      `${backendUrl}/api/educator/add-course`,
-      formData,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    if (data.success) {
-      toast.success(data.message);
-      setCourseTitle('');
-      setCoursePrice(0);
-      setDiscount(0);
-      setImage(null);
-      setChapters([]);
-      quillRef.current.root.innerHTML = '';
-    } else {
-      toast.error(data.message);
-    }
-  } catch (error) {
-    toast.error(error.message);
   }
-};
+
+  if (loading) return <p className='p-6'>Loading course details...</p>
 
   return (
     <div className='h-screen overflow-y-auto flex flex-col items-start md:p-8 p-4'>
@@ -261,13 +296,19 @@ const handleSubmit = async (e) => {
                 accept='image/*'
                 hidden
               />
-              {image && (
+              {image ? (
                 <img
                   className='max-h-10 rounded'
                   src={URL.createObjectURL(image)}
-                  alt='Course thumbnail preview'
+                  alt='New thumbnail'
                 />
-              )}
+              ) : existingImage ? (
+                <img
+                  className='max-h-10 rounded'
+                  src={existingImage}
+                  alt='Existing thumbnail'
+                />
+              ) : null}
             </label>
           </div>
         </div>
@@ -302,12 +343,12 @@ const handleSubmit = async (e) => {
 
           {chapters.map((chapter, chapterIndex) => (
             <div
-              key={chapter.id}
+              key={chapter.id || chapter.chapterId}
               className='bg-white border rounded-lg mb-4 shadow-sm'
             >
               <div
                 className='flex justify-between items-center p-4 border-b cursor-pointer'
-                onClick={() => handleChapter('toggle', chapter.id)}
+                onClick={() => handleChapter('toggle', chapter.id || chapter.chapterId)}
               >
                 <div className='flex items-center'>
                   <img
@@ -324,7 +365,7 @@ const handleSubmit = async (e) => {
                 </div>
                 <div className='flex items-center gap-3'>
                   <span className='text-gray-500'>
-                    {chapter.lectures.length} lecture
+                    {chapter.lectures?.length || 0} lecture
                   </span>
                   <img
                     src={assets.cross_icon}
@@ -340,9 +381,9 @@ const handleSubmit = async (e) => {
 
               {!chapter.collapsed && (
                 <div className='p-4 text-sm text-gray-600'>
-                  {chapter.lectures.map((lecture, lectureIndex) => (
+                  {chapter.lectures?.map((lecture, lectureIndex) => (
                     <div
-                      key={lectureIndex}
+                      key={lecture.lectureId || lectureIndex}
                       className='flex justify-between items-center mb-2 border-b pb-1'
                     >
                       <span>
@@ -358,14 +399,27 @@ const handleSubmit = async (e) => {
                         </a>{' '}
                         – {lecture.isPreviewFree ? 'Free Preview' : 'Paid'}
                       </span>
-                      <img
-                        src={assets.cross_icon}
-                        alt='delete lecture'
-                        className='cursor-pointer w-4'
-                        onClick={() =>
-                          deleteLecture(chapterIndex, lectureIndex)
-                        }
-                      />
+
+                      <div className='flex gap-2'>
+                        <button
+                          type='button'
+                          onClick={() =>
+                            openLecturePopup(chapterIndex, lectureIndex)
+                          }
+                          className='text-sm text-blue-600 underline'
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type='button'
+                          onClick={() =>
+                            deleteLecture(chapterIndex, lectureIndex)
+                          }
+                          className='text-sm text-red-600 underline'
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))}
 
@@ -383,9 +437,9 @@ const handleSubmit = async (e) => {
 
         <button
           type='submit'
-          className='bg-black text-white w-max py-2.5 px-8 rounded my-4'
+          className='bg-green-600 text-white w-max py-2.5 px-8 rounded my-4 hover:bg-green-700 transition'
         >
-          Add Course
+          Update Course
         </button>
       </form>
 
@@ -393,9 +447,10 @@ const handleSubmit = async (e) => {
       {showPopup && (
         <div className='fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50'>
           <div className='bg-white text-gray-700 p-4 rounded relative w-full max-w-md'>
-            <h2 className='text-lg font-semibold mb-4'>Add Lecture</h2>
+            <h2 className='text-lg font-semibold mb-4'>
+              {editingLectureIndex !== null ? 'Edit Lecture' : 'Add Lecture'}
+            </h2>
 
-            {/* Lecture title */}
             <div className='mb-2'>
               <p>Lecture Title</p>
               <input
@@ -411,7 +466,6 @@ const handleSubmit = async (e) => {
               />
             </div>
 
-            {/* Duration */}
             <div className='mb-2'>
               <p>Duration (minutes)</p>
               <input
@@ -427,7 +481,6 @@ const handleSubmit = async (e) => {
               />
             </div>
 
-            {/* URL */}
             <div className='mb-2'>
               <p>Lecture URL</p>
               <input
@@ -443,7 +496,6 @@ const handleSubmit = async (e) => {
               />
             </div>
 
-            {/* Preview checkbox */}
             <div className='mb-3 flex items-center gap-2'>
               <input
                 type='checkbox'
@@ -460,14 +512,17 @@ const handleSubmit = async (e) => {
 
             <button
               type='button'
-              onClick={addLecture}
+              onClick={saveLecture}
               className='w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition'
             >
-              Add Lecture
+              {editingLectureIndex !== null ? 'Save Changes' : 'Add Lecture'}
             </button>
 
             <img
-              onClick={() => setShowPopup(false)}
+              onClick={() => {
+                setShowPopup(false)
+                setEditingLectureIndex(null)
+              }}
               src={assets.cross_icon}
               className='absolute top-4 right-4 w-4 cursor-pointer'
               alt='close'
@@ -479,4 +534,4 @@ const handleSubmit = async (e) => {
   )
 }
 
-export default EducatorAddCourses
+export default EducatorEditCourse
