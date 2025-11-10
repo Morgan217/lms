@@ -104,24 +104,24 @@ export const dummyEducatorData = {
 export const dummyTestimonial = [
     {
         name: 'Donald Jackman',
-        role: 'SWE 1 @ Amazon',
+        role: 'Developer 1 @ Amazon',
         image: assets.profile_img_1,
         rating: 5,
-        feedback: 'I\'ve been using Imagify for nearly two years, primarily for Instagram, and it has been incredibly user-friendly, making my work much easier.',
+        feedback: 'I\'ve been using this LMS for nearly two years, primarily for Instagram, and it has been incredibly user-friendly, making my work much easier.',
     },
     {
         name: 'Richard Nelson',
-        role: 'SWE 2 @ Samsung',
+        role: 'Soultions Architect 2 @ Samsung',
         image: assets.profile_img_2,
         rating: 4,
-        feedback: 'I\'ve been using Imagify for nearly two years, primarily for Instagram, and it has been incredibly user-friendly, making my work much easier.',
+        feedback: 'I\'ve been using this LMS for nearly two years, primarily for Instagram, and it has been incredibly user-friendly, making my work much easier.',
     },
     {
         name: 'James Washington',
-        role: 'SWE 2 @ Google',
+        role: 'Project Manager 3 @ Google',
         image: assets.profile_img_3,
         rating: 4.5,
-        feedback: 'I\'ve been using Imagify for nearly two years, primarily for Instagram, and it has been incredibly user-friendly, making my work much easier.',
+        feedback: 'I\'ve been using this LMS for nearly two years, primarily for Instagram, and it has been incredibly user-friendly, making my work much easier.',
     },
 ];
 
